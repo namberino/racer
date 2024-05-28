@@ -1,6 +1,3 @@
-# This Code is Heavily Inspired By The YouTuber: Cheesy AI
-# Code Changed, Optimized And Commented By: NeuralNine (Florian Dedov)
-
 import math
 import random
 import sys
@@ -21,39 +18,40 @@ CAR_SIZE_Y = 60
 
 BORDER_COLOR = (255, 255, 255, 255) # color to crash on hit
 
-current_generation = 0 # Generation counter
+MAX_GEN = 20 # number of simulations to run
+
+current_generation = 0 # generation counter
 
 class Car:
 
     def __init__(self):
         # Load Car Sprite and Rotate
-        self.sprite = pygame.image.load('img/car.png').convert() # Convert Speeds Up A Lot
+        self.sprite = pygame.image.load('img/car.png').convert()
         self.sprite = pygame.transform.scale(self.sprite, (CAR_SIZE_X, CAR_SIZE_Y))
         self.rotated_sprite = self.sprite 
 
-        # self.position = [690, 740] # Starting Position
-        self.position = [830, 920] # Starting Position
+        self.position = [830, 920] # starting position
         self.angle = 0
         self.speed = 0
 
-        self.speed_set = False # Flag For Default Speed Later on
+        self.speed_set = False # flag for default speed later on
 
-        self.center = [self.position[0] + CAR_SIZE_X / 2, self.position[1] + CAR_SIZE_Y / 2] # Calculate Center
+        self.center = [self.position[0] + CAR_SIZE_X / 2, self.position[1] + CAR_SIZE_Y / 2] # calculate center
 
-        self.radars = [] # List For Sensors / Radars
-        self.drawing_radars = [] # Radars To Be Drawn
+        self.radars = [] # list for sensors / radars
+        self.drawing_radars = [] # radars to be drawn
 
-        self.alive = True # Boolean To Check If Car is Crashed
+        self.alive = True # for checking if car is crashed
 
-        self.distance = 0 # Distance Driven
-        self.time = 0 # Time Passed
+        self.distance = 0 # distance driven
+        self.time = 0 # time passed
 
     def draw(self, screen):
-        screen.blit(self.rotated_sprite, self.position) # Draw Sprite
-        self.draw_radar(screen) #OPTIONAL FOR SENSORS
+        screen.blit(self.rotated_sprite, self.position) # draw sprite
+        self.draw_radar(screen) # OPTIONAL FOR SENSORS
 
     def draw_radar(self, screen):
-        # Optionally Draw All Sensors / Radars
+        # optionally draw all sensors / radars
         for radar in self.radars:
             position = radar[0]
             pygame.draw.line(screen, (0, 255, 0), self.center, position, 1)
@@ -62,8 +60,7 @@ class Car:
     def check_collision(self, game_map):
         self.alive = True
         for point in self.corners:
-            # If Any Corner Touches Border Color -> Crash
-            # Assumes Rectangle
+            # if any corner touches border color -> crash
             if game_map.get_at((int(point[0]), int(point[1]))) == BORDER_COLOR:
                 self.alive = False
                 break
@@ -73,25 +70,25 @@ class Car:
         x = int(self.center[0] + math.cos(math.radians(360 - (self.angle + degree))) * length)
         y = int(self.center[1] + math.sin(math.radians(360 - (self.angle + degree))) * length)
 
-        # While We Don't Hit BORDER_COLOR AND length < 300 (just a max) -> go further and further
+        # while we don't hit BORDER_COLOR and length < 300 (just a max) -> go farther
         while not game_map.get_at((x, y)) == BORDER_COLOR and length < 300:
             length = length + 1
             x = int(self.center[0] + math.cos(math.radians(360 - (self.angle + degree))) * length)
             y = int(self.center[1] + math.sin(math.radians(360 - (self.angle + degree))) * length)
 
-        # Calculate Distance To Border And Append To Radars List
+        # calculate distance to border and append to radars list
         dist = int(math.sqrt(math.pow(x - self.center[0], 2) + math.pow(y - self.center[1], 2)))
         self.radars.append([(x, y), dist])
     
     def update(self, game_map):
-        # Set The Speed To 20 For The First Time
-        # Only When Having 4 Output Nodes With Speed Up and Down
+        # set the speed to 20 for the first time
+        # only when having 4 output nodes with speed up and down
         if not self.speed_set:
             self.speed = 20
             self.speed_set = True
 
-        # Get Rotated Sprite And Move Into The Right X-Direction
-        # Don't Let The Car Go Closer Than 20px To The Edge
+        # get rotated sprite and move into the right x-direction
+        # don't let the car go closer than 20px to the edge
         self.rotated_sprite = self.rotate_center(self.sprite, self.angle)
         self.position[0] += math.cos(math.radians(360 - self.angle)) * self.speed
         self.position[0] = max(self.position[0], 20)
@@ -232,7 +229,7 @@ def run_simulation(genomes, config):
         screen.blit(text, text_rect)
 
         pygame.display.flip()
-        clock.tick(120) 
+        clock.tick(500) 
 
 def run_neat(config):
     config = neat.config.Config(neat.DefaultGenome,
@@ -247,9 +244,66 @@ def run_neat(config):
     ppl.add_reporter(stats)
     ppl.add_reporter(neat.Checkpointer(10))
     
-    ppl.run(run_simulation, 100)
+    best = ppl.run(run_simulation, MAX_GEN)
+
+    with open("best.pickle", "wb") as f:
+        pickle.dump(best, f)
+
+def test_best_model(config):
+    # load best genome
+    with open('best.pickle', 'rb') as f:
+        best = pickle.load(f)
+
+    config = neat.config.Config(neat.DefaultGenome,
+                                neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet,
+                                neat.DefaultStagnation,
+                                config)
+    
+    # create the neural network from best genome
+    net = neat.nn.FeedForwardNetwork.create(best, config)
+    
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+    clock = pygame.time.Clock()
+    generation_font = pygame.font.SysFont("Arial", 30)
+    game_map = pygame.image.load('img/map.png').convert()
+    car = Car()
+
+    while car.is_alive():
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                sys.exit(0)
+
+        output = net.activate(car.get_data())
+        choice = output.index(max(output))
+        if choice == 0:
+            car.angle += 10  # left
+        elif choice == 1:
+            car.angle -= 10  # right
+        elif choice == 2:
+            if car.speed - 2 >= 12:
+                car.speed -= 2  # slow down
+        else:
+            car.speed += 2  # speed up
+        
+        car.update(game_map)
+
+        # draw everything
+        screen.blit(game_map, (0, 0))
+        car.draw(screen)
+
+        text = generation_font.render("Best model generation: " + str(MAX_GEN), True, (0,0,0))
+        text_rect = text.get_rect()
+        text_rect.center = (900, 500)
+        screen.blit(text, text_rect)
+        
+        pygame.display.flip()
+        clock.tick(60)
+
 
 if __name__ == "__main__":
     config_path = "./config.txt"
 
-    run_neat(config_path)
+    #run_neat(config_path)
+    test_best_model(config_path)
