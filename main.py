@@ -18,15 +18,17 @@ CAR_SIZE_Y = 60
 
 BORDER_COLOR = (255, 255, 255, 255) # color to crash on hit
 
-MAX_GEN = 20 # number of simulations to run
+MAX_GEN = 50 # number of simulations to run
 
 current_generation = 0 # generation counter
 
-class Car:
+map_img_path = "img/map1.png"
+car_img_path = "img/car.png"
 
+class Car:
     def __init__(self):
         # Load Car Sprite and Rotate
-        self.sprite = pygame.image.load('img/car.png').convert()
+        self.sprite = pygame.image.load(car_img_path).convert()
         self.sprite = pygame.transform.scale(self.sprite, (CAR_SIZE_X, CAR_SIZE_Y))
         self.rotated_sprite = self.sprite 
 
@@ -167,7 +169,7 @@ def run_simulation(genomes, config):
     clock = pygame.time.Clock()
     generation_font = pygame.font.SysFont("Arial", 30)
     alive_font = pygame.font.SysFont("Arial", 20)
-    game_map = pygame.image.load('img/map.png').convert()
+    game_map = pygame.image.load(map_img_path).convert()
 
     global current_generation
     current_generation += 1
@@ -267,7 +269,7 @@ def test_best_model(config):
     screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
     clock = pygame.time.Clock()
     generation_font = pygame.font.SysFont("Arial", 30)
-    game_map = pygame.image.load('img/map.png').convert()
+    game_map = pygame.image.load(map_img_path).convert()
     car = Car()
 
     while car.is_alive():
